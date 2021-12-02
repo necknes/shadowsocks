@@ -27,11 +27,11 @@ try:
     gevent.monkey.patch_all(dns=gevent.version_info[0]>=1)
 except ImportError:
     gevent = None
-    print >>sys.stderr, 'warning: gevent not found, using threading instead'
+    print(sys.stderr, 'warning: gevent not found, using threading instead')
 
 import socket
 import select
-import SocketServer
+import socketserver
 import struct
 import string
 import hashlib
@@ -46,7 +46,7 @@ def get_table(key):
     s = m.digest()
     (a, b) = struct.unpack('<QQ', s)
     table = [c for c in string.maketrans('', '')]
-    for i in xrange(1, 1024):
+    for i in range(1, 1024):
         table.sort(lambda x, y: int(a % (ord(x) + i) - a % (ord(y) + i)))
     return table
 
@@ -60,11 +60,11 @@ def send_all(sock, data):
         if bytes_sent == len(data):
             return bytes_sent
 
-class ThreadingTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):   # Multiple inheritance
+class ThreadingTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):   # Multiple inheritance
     allow_reuse_address = True
 
 
-class Socks5Server(SocketServer.StreamRequestHandler):
+class Socks5Server(socketserver.StreamRequestHandler):
     ''' RequesHandlerClass Definition '''
     def handle_tcp(self, sock, remote):
         try:
@@ -91,10 +91,10 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             remote.close()
 
     def encrypt(self, data):
-        return data.translate(encrypt_table)
+        return data#.translate(encrypt_table)
 
     def decrypt(self, data):
-        return data.translate(decrypt_table)
+        return data#.translate(decrypt_table)
 
     def send_encrypt(self, sock, data):
         sock.send(self.encrypt(data))
@@ -103,22 +103,25 @@ class Socks5Server(SocketServer.StreamRequestHandler):
         try:
             sock = self.connection        # local socket [127.1:port]
             sock.recv(262)                # Sock5 Verification packet
-            sock.send("\x05\x00")         # Sock5 Response: '0x05' Version 5; '0x00' NO AUTHENTICATION REQUIRED
+            sock.send(b"\x05\x00")         # Sock5 Response: '0x05' Version 5; '0x00' NO AUTHENTICATION REQUIRED
             # After Authentication negotiation
             data = self.rfile.read(4)     # Forward request format: VER CMD RSV ATYP (4 bytes)
-            mode = ord(data[1])           # CMD == 0x01 (connect)
+            mode = data[1]           # CMD == 0x01 (connect)
             if mode != 1:
                 logging.warn('mode != 1')
                 return
-            addrtype = ord(data[3])       # indicate destination address type
-            addr_to_send = data[3]
+            addrtype = data[3]       # indicate destination address type
+            print(type(addrtype), addrtype)
+            addr_to_send = struct.pack("B", data[3])
+            print(type(addr_to_send),addr_to_send)
             if addrtype == 1:             # IPv4
                 addr_ip = self.rfile.read(4)            # 4 bytes IPv4 address (big endian)
                 addr = socket.inet_ntoa(addr_ip)
                 addr_to_send += addr_ip
             elif addrtype == 3:           # FQDN (Fully Qualified Domain Name)
                 addr_len = self.rfile.read(1)           # Domain name's Length
-                addr = self.rfile.read(ord(addr_len))   # Followed by domain name(e.g. www.google.com)
+                addr = self.rfile.read(int.from_bytes(addr_len,'big'))   # Followed by domain name(e.g. www.google.com)
+                print(type(addr_len), type(addr), type(addr_to_send))
                 addr_to_send += addr_len + addr
             else:
                 logging.warn('addr_type not support')
@@ -128,7 +131,7 @@ class Socks5Server(SocketServer.StreamRequestHandler):
             addr_to_send += addr_port                   # addr_to_send = ATYP + [Length] + dst addr/domain name + port
             port = struct.unpack('>H', addr_port)       # prase the big endian port number. Note: The result is a tuple even if it contains exactly one item.
             try:
-                reply = "\x05\x00\x00\x01"              # VER REP RSV ATYP
+                reply = b"\x05\x00\x00\x01"              # VER REP RSV ATYP
                 reply += socket.inet_aton('0.0.0.0') + struct.pack(">H", 2222)  # listening on 2222 on all addresses of the machine, including the loopback(127.0.0.1)
                 self.wfile.write(reply)                 # response packet
                 # reply immediately
@@ -140,17 +143,17 @@ class Socks5Server(SocketServer.StreamRequestHandler):
                 remote.connect((SERVER, REMOTE_PORT))
                 self.send_encrypt(remote, addr_to_send)      # encrypted
                 logging.info('connecting %s:%d' % (addr, port[0]))
-            except socket.error, e:
+            except socket.error as e:
                 logging.warn(e)
                 return
             self.handle_tcp(sock, remote)
-        except socket.error, e:
+        except socket.error as e:
             logging.warn(e)
 
 
 if __name__ == '__main__':
     os.chdir(os.path.dirname(__file__) or '.')
-    print 'shadowsocks v0.9'
+    print('shadowsocks v0.9')
 
     with open('config.json', 'rb') as f:
         config = json.load(f)
@@ -173,12 +176,12 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S', filemode='a+')
 
-    encrypt_table = ''.join(get_table(KEY))
-    decrypt_table = string.maketrans(encrypt_table, string.maketrans('', ''))
+    #encrypt_table = ''.join(get_table(KEY))
+    #decrypt_table = string.maketrans(encrypt_table, string.maketrans('', ''))
     try:
         server = ThreadingTCPServer(('', PORT), Socks5Server)   # s.bind(('', 80)) specifies that the socket is reachable by any address the machine happens to have.
         logging.info("starting server at port %d ..." % PORT)
         server.serve_forever()
-    except socket.error, e:
+    except socket.error as e:
         logging.error(e)
 
