@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 import sys
+import zlib
 
 try:
     import gevent, gevent.monkey
@@ -92,9 +93,12 @@ class Socks5Server(socketserver.StreamRequestHandler):
             remote.close()
 
     def encrypt(self, data):
+        #compress
+        data = zlib.compress(data, zlib.Z_BEST_COMPRESSION)
         return data#.translate(encrypt_table)
 
     def decrypt(self, data):
+        data = zlib.decompress(data)
         return data#.translate(decrypt_table)
 
     def handle(self):
