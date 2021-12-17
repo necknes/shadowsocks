@@ -41,8 +41,6 @@ import logging
 import getopt
 
 def get_table(key):
-    print(key, type(key))
-
     m = hashlib.md5()
     m.update(key.encode())
     s = m.digest()
@@ -68,6 +66,7 @@ class ThreadingTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 class Socks5Server(socketserver.StreamRequestHandler):
     def handle_tcp(self, sock, remote):
+        seperate_flag = b"\x00\xff"*8
         try:
             fdset = [sock, remote]
             while True:
@@ -76,9 +75,11 @@ class Socks5Server(socketserver.StreamRequestHandler):
                     data = sock.recv(4096)
                     if len(data) <= 0:
                         break
-                    result = send_all(remote, self.decrypt(data))
-                    if result < len(data):
-                        raise Exception('failed to send all data')
+                    datas_lst = data.split(seperate_flag)
+                    for data in datas_lst:
+                        result = send_all(remote, self.decrypt(data))
+                        if result < len(data):
+                            raise Exception('failed to send all data')
                 if remote in r:
                     data = remote.recv(4096)
                     if len(data) <= 0:

@@ -111,9 +111,7 @@ class Socks5Server(socketserver.StreamRequestHandler):
                 logging.warn('mode != 1')
                 return
             addrtype = data[3]       # indicate destination address type
-            print(type(addrtype), addrtype)
             addr_to_send = struct.pack("B", data[3])
-            print(type(addr_to_send),addr_to_send)
             if addrtype == 1:             # IPv4
                 addr_ip = self.rfile.read(4)            # 4 bytes IPv4 address (big endian)
                 addr = socket.inet_ntoa(addr_ip)
@@ -121,7 +119,6 @@ class Socks5Server(socketserver.StreamRequestHandler):
             elif addrtype == 3:           # FQDN (Fully Qualified Domain Name)
                 addr_len = self.rfile.read(1)           # Domain name's Length
                 addr = self.rfile.read(int.from_bytes(addr_len,'big'))   # Followed by domain name(e.g. www.google.com)
-                print(type(addr_len), type(addr), type(addr_to_send))
                 addr_to_send += addr_len + addr
             else:
                 logging.warn('addr_type not support')
