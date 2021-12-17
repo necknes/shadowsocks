@@ -66,7 +66,7 @@ class ThreadingTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 class Socks5Server(socketserver.StreamRequestHandler):
     def handle_tcp(self, sock, remote):
-        seperate_flag = b"\x00\xff"*8
+        seperate_flag = b"\x00\xff"*8 #
         try:
             fdset = [sock, remote]
             while True:
